@@ -7,12 +7,11 @@
   <link rel="shortcut icon" href="TemplateData/favicon.ico" />
   <link rel="stylesheet" href="TemplateData/style.css" />
 
-  <!-- Key: include viewport-fit and height=device-height -->
+  <!-- Keep these -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, height=device-height" />
 
   <style>
     html, body {
-      height: 100%;
       margin: 0;
       background: #0b0b0b;
       overscroll-behavior: none;
@@ -20,8 +19,12 @@
       -webkit-user-select: none;
       user-select: none;
       touch-action: none;
+
+      /* SAFARI FIX: ensure the root can grow to the physical available height */
+      height: 100%;
+      height: -webkit-fill-available; /* iOS Safari */
     }
-    /* Safe-area wrapper */
+
     .safe {
       position: fixed;
       inset: 0;
@@ -32,10 +35,11 @@
       display: grid;
       place-items: center;
 
-      /* Use the largest stable viewport height if available */
-      height: 100lvh;          /* iOS 16+/modern */
-      min-height: 100svh;      /* when toolbars visible */
-      /* JS fallback below sets --vh; this line makes it take precedence if set */
+      /* Prefer the largest stable viewport; fall back to webkit fill */
+      height: 100lvh;
+      min-height: 100svh;
+      min-height: -webkit-fill-available; /* SAFARI FIX */
+      /* JS will also set --vh; if present this line wins */
       height: calc(var(--vh, 1lvh) * 100);
     }
 
@@ -51,7 +55,6 @@
     #unity-canvas {
       display: block;
       background: #000;
-      /* Prevent template CSS from shrinking it—JS sets explicit px size */
       width: 100% !important;
       height: auto !important;
       max-width: 100%;
@@ -112,18 +115,6 @@
 
   <script>
     const canvas = document.querySelector("#unity-canvas");
-    const safeRoot = document.querySelector(".safe");
-
-    /* ---------- iOS initial-height fallback ---------- */
-    function setVHVar() {
-      // Prefer the biggest reliable height: physical screen / DPR
-      const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
-      const screenH = (window.screen && window.screen.height) ? window.screen.height : window.innerHeight;
-      const logicalScreenH = screenH / dpr;
-      const best = Math.max(logicalScreenH, window.innerHeight, (window.visualViewport ? window.visualViewport.height : 0));
-      document.documentElement.style.setProperty('--vh', (best * 0.01) + 'px');
-    }
-    setVHVar();
 
     function unityShowBanner(msg, type) {
       const warningBanner = document.querySelector("#unity-warning");
@@ -151,26 +142,37 @@
       companyName: "DefaultCompany",
       productName: "horseGame URP",
       productVersion: "0.1.0",
-      showBanner: unityShowBanner,
-      // Keep Unity in sync with our canvas size
-      // (you can set to false if you fully control buffer sizes yourself)
-      // matchWebGLToCanvasSize: true,
+      showBanner: unityShowBanner
     };
 
-    /* ---------- Responsive sizing ---------- */
-    const ASPECT = 9 / 16;   // portrait
+    /* ------------ Responsive sizing (with Safari-first pass) ------------ */
+    const ASPECT = 9 / 16;
     const MAX_DPR = 1.75;
+
+    const IS_SAFARI = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+                      || !!navigator.userAgent.match(/iPhone|iPad|iPod/) && !!window.safari;
+
+    function setVHVar() {
+      // SAFARI FIX: prefer physical screen height / DPR for the first paint
+      const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
+      const screenH = (window.screen && window.screen.height) ? window.screen.height : window.innerHeight;
+      const logicalScreenH = screenH / dpr;
+      const best = Math.max(logicalScreenH, window.innerHeight, (window.visualViewport ? window.visualViewport.height : 0));
+      document.documentElement.style.setProperty('--vh', (best * 0.01) + 'px');
+    }
 
     function getViewportWH() {
       const dpr = Math.min(window.devicePixelRatio || 1, 4);
       const vv = window.visualViewport;
+
+      // Start with typical values
       let w = vv ? vv.width : window.innerWidth;
       let h = vv ? vv.height : window.innerHeight;
 
-      // If initial h is tiny, fall back to physical screen height
-      const screenHLogical = (window.screen && window.screen.height) ? (window.screen.height / dpr) : h;
-      if (h < screenHLogical * 0.8) {
-        h = screenHLogical;
+      // SAFARI FIX: if the URL bar shrinks innerHeight initially, trust screen height
+      if (IS_SAFARI) {
+        const screenHLogical = (window.screen && window.screen.height) ? (window.screen.height / dpr) : h;
+        if (h < screenHLogical * 0.9) h = screenHLogical;
       }
       return { w, h };
     }
@@ -181,24 +183,23 @@
       if (w / h > ASPECT) { cssH = h; cssW = h * ASPECT; }
       else { cssW = w; cssH = w / ASPECT; }
 
-      // CSS pixels (display size)
-      canvas.style.width = cssW + "px";
+      canvas.style.width  = cssW + "px";
       canvas.style.height = cssH + "px";
 
-      // Render buffer size
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
       canvas.width  = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
     }
 
-    // Stabilize around first paint & after orientation
-    function stabilize(ms = 1000) {
+    // Strong stabilization around first paint & after orientation (Safari needs it)
+    function stabilize(ms = 1200) {
       const start = performance.now();
       function tick(now) {
         setVHVar();
         sizeCanvas();
         if (now - start < ms) requestAnimationFrame(tick);
       }
+      setVHVar();
       sizeCanvas();
       requestAnimationFrame(tick);
       setTimeout(sizeCanvas, 120);
@@ -206,16 +207,16 @@
       setTimeout(sizeCanvas, 720);
     }
 
-    // Boot sizing
+    // Initial sizing
     stabilize();
 
     // Events
     let raf;
     function qResize(){ cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { setVHVar(); sizeCanvas(); }); }
     window.addEventListener('resize', qResize);
-    window.addEventListener('orientationchange', () => setTimeout(() => stabilize(1200), 120));
-    window.addEventListener('pageshow', () => stabilize(800));
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) stabilize(800); });
+    window.addEventListener('orientationchange', () => setTimeout(() => stabilize(1400), 120));
+    window.addEventListener('pageshow', () => stabilize(900));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) stabilize(900); });
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', qResize);
       window.visualViewport.addEventListener('scroll', qResize);
@@ -241,9 +242,8 @@
         document.querySelector("#unity-progress-bar-full").style.width = (progress * 100).toFixed(0) + "%";
       }).then((unityInstance) => {
         document.querySelector("#unity-loading-bar").style.display = "none";
-
-        // In case Unity or template modifies canvas styles, enforce sizing briefly
-        stabilize(1200);
+        // Re-enforce size briefly after Unity touches the canvas (Safari quirk)
+        stabilize(1400);
 
         document.querySelector("#unity-fullscreen-button").onclick = () => unityInstance.SetFullscreen(1);
       }).catch((message) => {
