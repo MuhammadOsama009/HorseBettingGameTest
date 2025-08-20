@@ -7,113 +7,91 @@
   <link rel="shortcut icon" href="TemplateData/favicon.ico" />
   <link rel="stylesheet" href="TemplateData/style.css" />
 
-  <!-- mobile responsiveness + safe areas -->
+  <!-- Mobile responsiveness + safe areas -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <style>
-    :root{ --vh: 1vh; }
+    :root { --vh: 1vh; }
 
-    html,body{ margin:0; padding:0; height:100%; background:#0b0b0b; }
-    /* Neutralize Unity template classes that fight sizing */
-    .unity-mobile,.unity-desktop{ all:unset; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b0b0b; }
+    /* Neutralize Unity template classes that might fight sizing */
+    .unity-mobile, .unity-desktop { all: unset; }
 
-    #unity-container{
-      position:fixed; inset:0;
-      display:flex; align-items:center; justify-content:center;
-      background:#0b0b0b;
+    /* Root container centers the game area */
+    #unity-container {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #0b0b0b;
     }
 
-    /* Desktop: phone-like frame (9:16); mobile will fill the screen */
-    .portrait-wrapper{
-      position:relative; display:block; box-sizing:border-box;
-      background:#000; border-radius:24px; overflow:hidden;
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
-      width:405px; height:720px; /* default; JS resizes on desktop */
-      touch-action:none;
+    /* Desktop: phone-like frame (9:16). Mobile will fill screen. */
+    .portrait-wrapper {
+      position: relative; display: block; box-sizing: border-box;
+      background: #000; border-radius: 24px; overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      width: 405px;  /* ~9:16 starting size; JS resizes for desktop */
+      height: 720px;
+      touch-action: none;
     }
 
-    #unity-canvas{
-      display:block; width:100% !important; height:100% !important; background:#000;
+    /* Canvas always fills the wrapper */
+    #unity-canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      background: #000;
     }
 
-    #unity-loading-bar{
-      position:absolute; left:50%; transform:translateX(-50%);
-      bottom:14px; z-index:10;
+    /* Loading bar & warning positions */
+    #unity-loading-bar {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      bottom: 14px; z-index: 10;
     }
-    #unity-warning{
-      position:absolute; top:8px; left:8px; right:8px; z-index:11;
+    #unity-warning {
+      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 11;
     }
 
     /* MOBILE portrait: fill visible screen exactly (no overflow) */
-    @media (max-width:1024px) and (orientation:portrait){
-      .portrait-wrapper{
-        width:100vw !important;
-        /* Prefer small/large/dynamic vh when supported, fallback to --vh */
-        height:100svh !important;
-        height:100dvh !important;
-        height:calc(var(--vh) * 100) !important;
-        border-radius:0; box-shadow:none;
+    @media (max-width: 1024px) and (orientation: portrait) {
+      .portrait-wrapper {
+        width: 100vw !important;
+        /* Prefer modern viewport units; fallback to --vh for iOS Safari quirks */
+        height: 100svh !important;
+        height: 100dvh !important;
+        height: calc(var(--vh) * 100) !important;
+        border-radius: 0; box-shadow: none;
       }
     }
 
-    /* Rotate overlay for mobile landscape */
-    #rotate-overlay{
-      position:fixed; inset:0; z-index:9998;
-      display:none; align-items:center; justify-content:center;
-      background:#0b0b0b; color:#fff; text-align:center; padding:24px;
-      font:600 16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    /* MOBILE landscape: show rotate message and hide game */
+    #rotate-overlay {
+      position: fixed; inset: 0; z-index: 9998;
+      display: none; align-items: center; justify-content: center;
+      background: #0b0b0b; color: #fff; text-align: center; padding: 24px;
+      font: 600 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    @media (max-width:1024px) and (orientation:landscape){
-      #rotate-overlay{ display:flex; }
-      #unity-container{ visibility:hidden; }
-      #mobile-start{ display:none !important; }
+    @media (max-width: 1024px) and (orientation: landscape) {
+      #rotate-overlay { display: flex; }
+      #unity-container { visibility: hidden; }
     }
 
-    /* Footer (desktop only) */
-    #unity-footer{
-      position:fixed; left:0; right:0; bottom:0;
-      display:flex; align-items:center; justify-content:space-between;
-      gap:12px; padding:8px 12px; color:#fff;
-      background:rgba(0,0,0,.4); backdrop-filter:blur(2px);
-      z-index:1000;
+    /* Footer (keep on desktop; hide on phones) */
+    #unity-footer {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 8px 12px; color: #fff;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+      z-index: 1000;
     }
-    #unity-logo-title-footer{ display:flex; align-items:center; gap:10px; }
-    #unity-build-title{ font:500 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; opacity:.9; }
-    #unity-fullscreen-button{ cursor:pointer; }
-    @media (max-width:1024px){ #unity-footer{ display:none; } }
-
-    /* Mobile gate: guarantees user gesture for fullscreen */
-    #mobile-start{
-      position:fixed; inset:0; z-index:9999;
-      display:none; align-items:center; justify-content:center;
-      background:#000; color:#fff; text-align:center; padding:24px;
-    }
-    #mobile-start .box{
-      max-width:420px; width:calc(100vw - 40px); margin:16px;
-      border:1px solid rgba(255,255,255,.15); border-radius:16px; padding:20px;
-      background:rgba(20,20,20,.85);
-    }
-    #mobile-start h1{ margin:0 0 12px 0; font:700 20px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    #mobile-start p{ margin:0 0 16px 0; font:400 14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; opacity:.9; }
-    #mobile-start button{
-      width:100%; border:none; border-radius:12px; padding:14px 16px;
-      font:600 16px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      background:#1e90ff; color:#fff; cursor:pointer;
-    }
+    #unity-logo-title-footer { display: flex; align-items: center; gap: 10px; }
+    #unity-build-title { font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; opacity: .9; }
+    #unity-fullscreen-button { cursor: pointer; }
+    @media (max-width: 1024px) { #unity-footer { display: none; } } /* hide footer on mobile */
   </style>
 </head>
 <body>
   <div id="rotate-overlay">Please rotate your device to portrait.</div>
-
-  <!-- Mobile fullscreen gate -->
-  <div id="mobile-start" role="dialog" aria-modal="true">
-    <div class="box">
-      <h1>Ready to play?</h1>
-      <p>Tap continue to enter fullscreen (portrait).</p>
-      <button id="enterFullscreenBtn" type="button">Continue</button>
-    </div>
-  </div>
 
   <div id="unity-container">
     <div class="portrait-wrapper" id="portraitWrapper">
@@ -142,34 +120,36 @@
   <script>
     const canvas  = document.getElementById("unity-canvas");
     const wrapper = document.getElementById("portraitWrapper");
-    const mobileGate = document.getElementById("mobile-start");
-    const enterBtn = document.getElementById("enterFullscreenBtn");
 
-    /* --- robust mobile 100vh fix --- */
-    function setVhUnit(){
+    /* --- Robust mobile 100vh fix (handles iOS/Android toolbars) --- */
+    function setVhUnit() {
       const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01;
       document.documentElement.style.setProperty('--vh', `${h}px`);
     }
     setVhUnit();
-    window.addEventListener('resize', setVhUnit, {passive:true});
-    if (window.visualViewport){
-      window.visualViewport.addEventListener('resize', setVhUnit, {passive:true});
+    window.addEventListener('resize', setVhUnit, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setVhUnit, { passive: true });
     }
 
-    function isMobileUA(){
+    function isMobileUA() {
       return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     }
 
-    /* Desktop 9:16 sizing */
-    (function desktopSizer(){
-      const ASPECT_W=9, ASPECT_H=16;
-      function sizeDesktop(){
-        if (isMobileUA()) return;
-        const vw=window.innerWidth, vh=window.innerHeight;
-        const maxH=Math.min(Math.floor(vh*0.96),1080);
-        let h=maxH, w=Math.round(h*ASPECT_W/ASPECT_H);
-        if (w > vw*0.96){ w=Math.floor(vw*0.96); h=Math.round(w*ASPECT_H/ASPECT_W); }
-        wrapper.style.width=w+'px'; wrapper.style.height=h+'px';
+    /* Desktop: keep a fitted 9:16 frame centered */
+    (function desktopSizer() {
+      const ASPECT_W = 9, ASPECT_H = 16;
+      function sizeDesktop() {
+        if (isMobileUA()) return; // mobile is CSS-driven
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const maxH = Math.min(Math.floor(vh * 0.96), 1080); // optional cap
+        let h = maxH, w = Math.round(h * ASPECT_W / ASPECT_H);
+        if (w > vw * 0.96) {
+          w = Math.floor(vw * 0.96);
+          h = Math.round(w * ASPECT_H / ASPECT_W);
+        }
+        wrapper.style.width  = w + 'px';
+        wrapper.style.height = h + 'px';
       }
       window.addEventListener('resize', sizeDesktop);
       document.addEventListener('DOMContentLoaded', sizeDesktop);
@@ -177,103 +157,55 @@
     })();
 
     /* Unity banner */
-    function unityShowBanner(msg, type){
-      const warningBanner=document.querySelector("#unity-warning");
-      function update(){ warningBanner.style.display = warningBanner.children.length ? 'block' : 'none'; }
-      const div=document.createElement('div');
-      div.innerHTML=msg;
+    function unityShowBanner(msg, type) {
+      const warningBanner = document.querySelector("#unity-warning");
+      function update() { warningBanner.style.display = warningBanner.children.length ? 'block' : 'none'; }
+      const div = document.createElement('div');
+      div.innerHTML = msg;
       warningBanner.appendChild(div);
-      if (type==='error'){ div.style='background:red; padding:10px;'; }
-      else{
-        if (type==='warning') div.style='background:yellow; padding:10px;';
-        setTimeout(()=>{ warningBanner.removeChild(div); update(); }, 5000);
+      if (type === 'error') {
+        div.style = 'background:red; padding:10px;';
+      } else {
+        if (type === 'warning') div.style = 'background:yellow; padding:10px;';
+        setTimeout(() => { warningBanner.removeChild(div); update(); }, 5000);
       }
       update();
     }
 
     /* Build config */
-    const buildUrl="Build";
-    const loaderUrl=buildUrl+"/BuildWebGLv4.0.loader.js";
-    const config={
-      arguments:[],
-      dataUrl:buildUrl+"/BuildWebGLv4.0.data.unityweb",
-      frameworkUrl:buildUrl+"/BuildWebGLv4.0.framework.js.unityweb",
-      codeUrl:buildUrl+"/BuildWebGLv4.0.wasm.unityweb",
-      streamingAssetsUrl:"StreamingAssets",
-      companyName:"DefaultCompany",
-      productName:"horseGame URP",
-      productVersion:"0.1.0",
-      showBanner:unityShowBanner
+    const buildUrl  = "Build";
+    const loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
+    const config = {
+      arguments: [],
+      dataUrl: buildUrl + "/BuildWebGLv4.0.data.unityweb",
+      frameworkUrl: buildUrl + "/BuildWebGLv4.0.framework.js.unityweb",
+      codeUrl: buildUrl + "/BuildWebGLv4.0.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "horseGame URP",
+      productVersion: "0.1.0",
+      showBanner: unityShowBanner
+      // Default behavior: Unity matches WebGL RT to canvas CSS size (good!)
     };
 
-    let unityInstance=null;
-    let pendingFullscreen=false;
-
-    function showMobileGateIfNeeded(){
-      if (isMobileUA()) mobileGate.style.display="flex";
-    }
-    showMobileGateIfNeeded();
-
-    // Try multiple fullscreen targets (kept synchronous inside click handler)
-    function tryFullscreenSync(){
-      const targets=[canvas, wrapper, document.documentElement, document.body];
-      for (const el of targets){
-        if (!el) continue;
-        try{
-          if (el.requestFullscreen){ el.requestFullscreen({navigationUI:"hide"}); return true; }
-          if (el.webkitRequestFullscreen){ el.webkitRequestFullscreen(); return true; }      // iOS/WebKit
-          if (el.msRequestFullscreen){ el.msRequestFullscreen(); return true; }              // old Edge
-          if (el.mozRequestFullScreen){ el.mozRequestFullScreen(); return true; }            // old Firefox
-        }catch(e){ /* ignore and try next */ }
-      }
-      return false;
-    }
-
-    async function lockPortraitIfPossible(){
-      try{
-        if (screen.orientation && screen.orientation.lock){
-          await screen.orientation.lock('portrait');
-        }
-      }catch(e){ /* ignore */ }
-    }
-
-    function enterMobileFullscreen(){
-      const ok = tryFullscreenSync(); // must be called in direct click handler
-      lockPortraitIfPossible();
-      if (unityInstance){
-        try{ unityInstance.SetFullscreen(1); }catch(e){}
-      }else{
-        pendingFullscreen=true;
-      }
-      mobileGate.style.display="none";
-      return ok;
-    }
-
-    enterBtn.addEventListener('click', enterMobileFullscreen);
-
     /* Show loading bar */
-    document.querySelector("#unity-loading-bar").style.display="block";
+    document.querySelector("#unity-loading-bar").style.display = "block";
 
     /* Load Unity */
-    const script=document.createElement("script");
-    script.src=loaderUrl;
-    script.onload=()=> {
-      createUnityInstance(canvas, config, (progress)=>{
-        document.querySelector("#unity-progress-bar-full").style.width=(100*progress)+"%";
-      }).then((inst)=>{
-        unityInstance=inst;
-        document.querySelector("#unity-loading-bar").style.display="none";
+    let unityInstance = null;
+    const script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config, (progress) => {
+        document.querySelector("#unity-progress-bar-full").style.width = (100 * progress) + "%";
+      }).then((inst) => {
+        unityInstance = inst;
+        document.querySelector("#unity-loading-bar").style.display = "none";
 
-        // Desktop fullscreen button
-        const fsBtn=document.getElementById("unity-fullscreen-button");
-        if (fsBtn) fsBtn.onclick=()=> unityInstance.SetFullscreen(1);
-
-        // If user already tapped gate before instance ready
-        if (pendingFullscreen && isMobileUA()){
-          pendingFullscreen=false;
-          try{ unityInstance.SetFullscreen(1); }catch(e){}
-        }
-      }).catch((message)=> alert(message));
+        // Desktop fullscreen button (won't show on mobile due to CSS)
+        const fsBtn = document.getElementById("unity-fullscreen-button");
+        if (fsBtn) fsBtn.onclick = () => unityInstance.SetFullscreen(1);
+      }).catch((message) => alert(message));
     };
     document.body.appendChild(script);
   </script>
