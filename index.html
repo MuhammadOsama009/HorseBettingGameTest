@@ -1,127 +1,194 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | horseGame URP</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  <body>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=768 height=1366 tabindex="-1"></canvas>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Unity Web Player | horseGame URP</title>
+  <link rel="shortcut icon" href="TemplateData/favicon.ico">
+  <link rel="stylesheet" href="TemplateData/style.css">
+
+  <!-- Make mobile fill the screen and respect safe areas -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b0b0b; }
+    /* Keep Unity container centered */
+    #unity-container {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* Phone-like wrapper that we will size via JS */
+    .portrait-wrapper {
+      position: relative;
+      display: block;
+      box-sizing: border-box;
+      background: #000;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    /* Canvas should always stretch to wrapper */
+    #unity-canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      background: #000;
+    }
+    /* Mobile portrait: fill screen, no rounded corners */
+    @media (max-width: 1024px) and (orientation: portrait) {
+      .portrait-wrapper {
+        width: 100vw; height: 100vh;
+        border-radius: 0; box-shadow: none;
+      }
+    }
+    /* Rotate overlay for mobile landscape */
+    #rotate-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: none; align-items: center; justify-content: center;
+      background: #0b0b0b; color: #fff;
+      text-align: center; padding: 24px;
+      font: 600 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    @media (max-width: 1024px) and (orientation: landscape) {
+      #rotate-overlay { display: flex; }
+      #unity-container { visibility: hidden; }
+    }
+
+    /* Keep your existing loading bar/footer positioning intact */
+    #unity-loading-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px; }
+    #unity-footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 12px; }
+  </style>
+</head>
+<body>
+  <div id="rotate-overlay">Please rotate your device to portrait.</div>
+
+  <div id="unity-container" class="unity-desktop">
+    <!-- Wrapper that we will size to 9:16 on desktop or full-screen on mobile -->
+    <div class="portrait-wrapper" id="portraitWrapper">
+      <canvas id="unity-canvas" width="768" height="1366" tabindex="-1"></canvas>
+
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
           <div id="unity-progress-bar-full"></div>
         </div>
       </div>
-      <div id="unity-warning"> </div>
-      <div id="unity-footer">
-        <div id="unity-logo-title-footer"></div>
-        <div id="unity-fullscreen-button"></div>
-        <div id="unity-build-title">horseGame URP</div>
-      </div>
     </div>
-    <script>
-      var canvas = document.querySelector("#unity-canvas");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        var warningBanner = document.querySelector("#unity-warning");
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
+    <div id="unity-warning"></div>
+
+    <div id="unity-footer">
+      <div id="unity-logo-title-footer"></div>
+      <div id="unity-fullscreen-button"></div>
+      <div id="unity-build-title">horseGame URP</div>
+    </div>
+  </div>
+
+  <script>
+    var canvas = document.querySelector("#unity-canvas");
+
+    function unityShowBanner(msg, type) {
+      var warningBanner = document.querySelector("#unity-warning");
+      function updateBannerVisibility() {
+        warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+      }
+      var div = document.createElement('div');
+      div.innerHTML = msg;
+      warningBanner.appendChild(div);
+      if (type == 'error') div.style = 'background: red; padding: 10px;';
+      else {
+        if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+        setTimeout(function () {
+          warningBanner.removeChild(div);
+          updateBannerVisibility();
+        }, 5000);
+      }
+      updateBannerVisibility();
+    }
+
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
+    var config = {
+      arguments: [],
+      dataUrl: buildUrl + "/BuildWebGLv4.0.data.unityweb",
+      frameworkUrl: buildUrl + "/BuildWebGLv4.0.framework.js.unityweb",
+      codeUrl: buildUrl + "/BuildWebGLv4.0.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "horseGame URP",
+      productVersion: "0.1.0",
+      showBanner: unityShowBanner,
+      // Leave the default behavior: match WebGL render target to canvas CSS size
+      // config.matchWebGLToCanvasSize = true;
+    };
+
+    // --- Portrait sizing logic ---
+    (function () {
+      const ASPECT_W = 9, ASPECT_H = 16; // portrait
+      const wrapper = document.getElementById('portraitWrapper');
+
+      function isMobileUA() {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       }
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/BuildWebGLv4.0.data.unityweb",
-        frameworkUrl: buildUrl + "/BuildWebGLv4.0.framework.js.unityweb",
-        codeUrl: buildUrl + "/BuildWebGLv4.0.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "horseGame URP",
-        productVersion: "0.1.0",
-        showBanner: unityShowBanner,
-      };
+      function sizeDesktopPortrait() {
+        // Fit within viewport, keep 9:16, leave a little margin
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const maxH = Math.min(Math.floor(vh * 0.96), 1080); // optional clamp
+        let h = maxH, w = Math.round(h * ASPECT_W / ASPECT_H);
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
-
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
-
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "384px";
-        canvas.style.height = "683px";
+        if (w > vw * 0.96) {
+          w = Math.floor(vw * 0.96);
+          h = Math.round(w * ASPECT_H / ASPECT_W);
+        }
+        wrapper.style.width = w + 'px';
+        wrapper.style.height = h + 'px';
       }
 
-      document.querySelector("#unity-loading-bar").style.display = "block";
+      function sizeMobilePortrait() {
+        // Fill entire screen
+        wrapper.style.width = window.innerWidth + 'px';
+        wrapper.style.height = window.innerHeight + 'px';
+      }
 
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
+      function applySizing() {
+        const mobile = isMobileUA();
+        const isPortrait = window.matchMedia('(orientation: portrait)').matches;
 
-              }).catch((message) => {
-                alert(message);
-              });
-            };
+        if (mobile) {
+          if (isPortrait) sizeMobilePortrait();
+          // Landscape handled by CSS overlay
+          // Optionally lower resolution for performance:
+          // config.devicePixelRatio = 1;
+        } else {
+          sizeDesktopPortrait();
+        }
+      }
 
-      document.body.appendChild(script);
+      window.addEventListener('resize', applySizing);
+      window.addEventListener('orientationchange', applySizing);
+      document.addEventListener('DOMContentLoaded', applySizing);
+      applySizing();
+    })();
 
-    </script>
-  </body>
+    document.querySelector("#unity-loading-bar").style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config, (progress) => {
+        document.querySelector("#unity-progress-bar-full").style.width = (100 * progress) + "%";
+      }).then((unityInstance) => {
+        document.querySelector("#unity-loading-bar").style.display = "none";
+        document.querySelector("#unity-fullscreen-button").onclick = () => {
+          unityInstance.SetFullscreen(1);
+        };
+      }).catch((message) => {
+        alert(message);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
 </html>
