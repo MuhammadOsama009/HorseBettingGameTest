@@ -12,9 +12,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <style>
-    :root { --vh: 1vh; }
+    :root { --vhpx: 100; } /* will be set in JS = visualViewport.height */
 
-    html, body { margin: 0; padding: 0; height: 100%; background: #0b0b0b; }
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%;
+      background: #0b0b0b;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
     /* Neutralize Unity template classes that might fight sizing */
     .unity-mobile, .unity-desktop { all: unset; }
 
@@ -23,15 +30,19 @@
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
       background: #0b0b0b;
+      /* Safe-area padding so nothing is under notches/home indicator */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
 
-    /* Desktop: phone-like frame (9:16). Mobile will fill screen. */
+    /* Desktop: phone-like frame (9:16). Mobile fills screen. */
     .portrait-wrapper {
       position: relative; display: block; box-sizing: border-box;
       background: #000; border-radius: 24px; overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-      width: 405px;  /* ~9:16 starting size; JS resizes for desktop */
-      height: 720px;
+      width: 405px; height: 720px; /* default for desktop; JS resizes */
       touch-action: none;
     }
 
@@ -41,6 +52,7 @@
       width: 100% !important;
       height: 100% !important;
       background: #000;
+      touch-action: none;
     }
 
     /* Loading bar & warning positions */
@@ -52,14 +64,11 @@
       position: absolute; top: 8px; left: 8px; right: 8px; z-index: 11;
     }
 
-    /* MOBILE portrait: fill visible screen exactly (no overflow) */
+    /* MOBILE portrait: fill the *true* visible screen (driven by JS var) */
     @media (max-width: 1024px) and (orientation: portrait) {
       .portrait-wrapper {
         width: 100vw !important;
-        /* Prefer modern viewport units; fallback to --vh for iOS Safari quirks */
-        height: 100svh !important;
-        height: 100dvh !important;
-        height: calc(var(--vh) * 100) !important;
+        height: calc(var(--vhpx) * 1px) !important; /* rock-solid on iOS */
         border-radius: 0; box-shadow: none;
       }
     }
@@ -76,7 +85,7 @@
       #unity-container { visibility: hidden; }
     }
 
-    /* Footer (keep on desktop; hide on phones) */
+    /* Footer (desktop only) */
     #unity-footer {
       position: fixed; left: 0; right: 0; bottom: 0;
       display: flex; align-items: center; justify-content: space-between;
@@ -87,7 +96,7 @@
     #unity-logo-title-footer { display: flex; align-items: center; gap: 10px; }
     #unity-build-title { font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; opacity: .9; }
     #unity-fullscreen-button { cursor: pointer; }
-    @media (max-width: 1024px) { #unity-footer { display: none; } } /* hide footer on mobile */
+    @media (max-width: 1024px) { #unity-footer { display: none; } } /* hide on phones */
   </style>
 </head>
 <body>
@@ -121,16 +130,29 @@
     const canvas  = document.getElementById("unity-canvas");
     const wrapper = document.getElementById("portraitWrapper");
 
-    /* --- Robust mobile 100vh fix (handles iOS/Android toolbars) --- */
-    function setVhUnit() {
-      const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01;
-      document.documentElement.style.setProperty('--vh', `${h}px`);
+    /* --- iOS/Android robust viewport height fix --- */
+    function getViewportHeightPx() {
+      // Prefer visualViewport.height (most accurate for iOS Safari)
+      if (window.visualViewport && window.visualViewport.height) {
+        return Math.round(window.visualViewport.height);
+      }
+      // Fallbacks
+      return Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
     }
-    setVhUnit();
-    window.addEventListener('resize', setVhUnit, { passive: true });
+    function updateVhVar() {
+      const vh = getViewportHeightPx();
+      document.documentElement.style.setProperty('--vhpx', String(vh));
+    }
+    updateVhVar();
+
+    // Update on all relevant signals (iOS URL bar show/hide, rotation, pinch)
+    window.addEventListener('resize', updateVhVar, { passive: true });
+    window.addEventListener('orientationchange', updateVhVar, { passive: true });
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', setVhUnit, { passive: true });
+      window.visualViewport.addEventListener('resize', updateVhVar, { passive: true });
+      window.visualViewport.addEventListener('scroll', updateVhVar, { passive: true });
     }
+    document.addEventListener('DOMContentLoaded', updateVhVar);
 
     function isMobileUA() {
       return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -140,7 +162,7 @@
     (function desktopSizer() {
       const ASPECT_W = 9, ASPECT_H = 16;
       function sizeDesktop() {
-        if (isMobileUA()) return; // mobile is CSS-driven
+        if (isMobileUA()) return; // mobile is CSS-driven via --vhpx
         const vw = window.innerWidth, vh = window.innerHeight;
         const maxH = Math.min(Math.floor(vh * 0.96), 1080); // optional cap
         let h = maxH, w = Math.round(h * ASPECT_W / ASPECT_H);
@@ -151,7 +173,7 @@
         wrapper.style.width  = w + 'px';
         wrapper.style.height = h + 'px';
       }
-      window.addEventListener('resize', sizeDesktop);
+      window.addEventListener('resize', sizeDesktop, { passive: true });
       document.addEventListener('DOMContentLoaded', sizeDesktop);
       sizeDesktop();
     })();
@@ -185,7 +207,7 @@
       productName: "horseGame URP",
       productVersion: "0.1.0",
       showBanner: unityShowBanner
-      // Default behavior: Unity matches WebGL RT to canvas CSS size (good!)
+      // Default: Unity matches WebGL render target to canvas CSS size (desired)
     };
 
     /* Show loading bar */
@@ -202,7 +224,7 @@
         unityInstance = inst;
         document.querySelector("#unity-loading-bar").style.display = "none";
 
-        // Desktop fullscreen button (won't show on mobile due to CSS)
+        // Desktop fullscreen button (hidden on phones by CSS)
         const fsBtn = document.getElementById("unity-fullscreen-button");
         if (fsBtn) fsBtn.onclick = () => unityInstance.SetFullscreen(1);
       }).catch((message) => alert(message));
