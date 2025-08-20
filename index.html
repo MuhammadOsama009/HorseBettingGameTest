@@ -7,22 +7,30 @@
   <link rel="shortcut icon" href="TemplateData/favicon.ico" />
   <link rel="stylesheet" href="TemplateData/style.css" />
 
-  <!-- Responsive & safe-area support -->
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
-  />
+  <!-- Critical for mobile responsiveness + safe areas -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <style>
-    html, body { height: 100%; margin: 0; background:#0b0b0b; }
+    :root {
+      /* fallback vh unit for mobile (updated via JS to handle iOS toolbars) */
+      --vh: 1vh;
+    }
+
+    html, body { margin:0; padding:0; height:100%; background:#0b0b0b; }
+
+    /* Override Unity template classes that might fight sizing */
+    .unity-mobile, .unity-desktop { all: unset; }
 
     /* Root container centers the game area */
     #unity-container {
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
+      background:#0b0b0b;
     }
 
-    /* Phone-like wrapper that holds the canvas and loading bar */
+    /* Phone-like wrapper that holds the canvas + loading bar */
     .portrait-wrapper {
       position: relative;
       display: block;
@@ -31,41 +39,43 @@
       border-radius: 24px;
       overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      /* Desktop default (JS will adjust too) */
+      width: 405px; /* ~9:16 */
+      height: 720px;
+      touch-action: none;
     }
 
     /* Canvas always fills the wrapper */
     #unity-canvas {
-      display: block;
-      width: 100% !important;
-      height: 100% !important;
-      background: #000;
+      display:block;
+      width:100% !important;
+      height:100% !important;
+      background:#000;
+      /* Prevent double-scaling on some mobile browsers */
+      image-rendering: optimizeSpeed;
     }
 
-    /* Loading bar: keep near bottom, centered */
+    /* Loading bar & warning positions */
     #unity-loading-bar {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 14px;
-      z-index: 10;
+      position:absolute; left:50%; transform:translateX(-50%);
+      bottom:14px; z-index:10;
     }
-
-    /* Warning banner stacks inside wrapper top by default (Unity style.css will style it too) */
     #unity-warning {
-      position: absolute;
-      top: 8px; left: 8px; right: 8px;
-      z-index: 11;
+      position:absolute; top:8px; left:8px; right:8px; z-index:11;
     }
 
-    /* Mobile portrait: fill the whole screen, no rounded corners */
+    /* MOBILE: Portrait should fill the whole screen (account for dynamic UI bars) */
     @media (max-width: 1024px) and (orientation: portrait) {
       .portrait-wrapper {
-        width: 100vw; height: 100vh;
-        border-radius: 0; box-shadow: none;
+        width: 100vw !important;
+        /* use small/large viewport units with JS fallback for iOS */
+        height: calc(var(--vh, 1vh) * 100) !important;
+        border-radius: 0;
+        box-shadow: none;
       }
     }
 
-    /* Rotate overlay for mobile landscape */
+    /* MOBILE: Show rotate overlay in landscape and hide game */
     #rotate-overlay {
       position: fixed; inset: 0; z-index: 9999;
       display: none; align-items: center; justify-content: center;
@@ -78,34 +88,24 @@
       #unity-container { visibility: hidden; }
     }
 
-    /* Footer pinned to screen bottom (outside the wrapper) */
+    /* Footer pinned to bottom (outside wrapper) */
     #unity-footer {
       position: fixed; left: 0; right: 0; bottom: 0;
       display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 8px 12px;
       background: rgba(0,0,0,0.4);
-      z-index: 1000;
+      z-index: 1000; color:#fff;
       backdrop-filter: blur(2px);
     }
-    /* Left side: Unity small logo/title holder from default template */
-    #unity-logo-title-footer {
-      display: flex; align-items: center; gap: 10px;
-    }
-    /* Right side: fullscreen button */
-    #unity-fullscreen-button {
-      cursor: pointer;
-    }
-    /* Optional: title styling */
-    #unity-build-title {
-      color: #fff; opacity: 0.9; font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      margin-left: 8px;
-    }
+    #unity-logo-title-footer { display:flex; align-items:center; gap:10px; }
+    #unity-build-title { font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; opacity:.9; }
+    #unity-fullscreen-button { cursor:pointer; }
   </style>
 </head>
 <body>
   <div id="rotate-overlay">Please rotate your device to portrait.</div>
 
-  <div id="unity-container" class="unity-desktop">
+  <div id="unity-container">
     <!-- Wrapper sized to 9:16 on desktop, full-bleed on mobile portrait -->
     <div class="portrait-wrapper" id="portraitWrapper">
       <canvas id="unity-canvas" width="768" height="1366" tabindex="-1"></canvas>
@@ -121,10 +121,9 @@
     </div>
   </div>
 
-  <!-- Footer OUTSIDE the wrapper, pinned to bottom -->
+  <!-- Footer OUTSIDE the wrapper -->
   <div id="unity-footer">
     <div id="unity-logo-title-footer">
-      <!-- default template provides image via CSS for #unity-logo-title-footer -->
       <div id="unity-build-title">horseGame URP</div>
     </div>
     <div style="display:flex; align-items:center; gap:12px;">
@@ -135,7 +134,18 @@
   <script>
     const canvas = document.querySelector("#unity-canvas");
 
-    // Unity warning/notice banner
+    /* --- Mobile 100vh fix (iOS/Android dynamic toolbars) --- */
+    function setVhUnit() {
+      const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    setVhUnit();
+    window.addEventListener('resize', setVhUnit);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setVhUnit);
+    }
+
+    /* Unity banner */
     function unityShowBanner(msg, type) {
       const warningBanner = document.querySelector("#unity-warning");
       function updateBannerVisibility() {
@@ -148,15 +158,12 @@
         div.style = 'background:red; padding:10px;';
       } else {
         if (type === 'warning') div.style = 'background:yellow; padding:10px;';
-        setTimeout(function () {
-          warningBanner.removeChild(div);
-          updateBannerVisibility();
-        }, 5000);
+        setTimeout(() => { warningBanner.removeChild(div); updateBannerVisibility(); }, 5000);
       }
       updateBannerVisibility();
     }
 
-    // Build config
+    /* Build config */
     const buildUrl = "Build";
     const loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
     const config = {
@@ -168,14 +175,13 @@
       companyName: "DefaultCompany",
       productName: "horseGame URP",
       productVersion: "0.1.0",
-      showBanner: unityShowBanner,
-      // Keep default: Unity matches WebGL RT to canvas CSS size
-      // matchWebGLToCanvasSize: true
+      showBanner: unityShowBanner
+      // Default behavior keeps WebGL RT matched to canvas CSS size (good!)
     };
 
-    // Portrait sizing logic
+    /* Desktop 9:16 sizing (mobile uses CSS/--vh) */
     (function () {
-      const ASPECT_W = 9, ASPECT_H = 16; // portrait aspect
+      const ASPECT_W = 9, ASPECT_H = 16;
       const wrapper = document.getElementById('portraitWrapper');
 
       function isMobileUA() {
@@ -184,10 +190,8 @@
 
       function sizeDesktopPortrait() {
         const vw = window.innerWidth, vh = window.innerHeight;
-        const maxH = Math.min(Math.floor(vh * 0.96), 1080); // optional clamp to avoid huge canvases
-        let h = maxH;
-        let w = Math.round(h * ASPECT_W / ASPECT_H);
-
+        const maxH = Math.min(Math.floor(vh * 0.96), 1080);
+        let h = maxH, w = Math.round(h * ASPECT_W / ASPECT_H);
         if (w > vw * 0.96) {
           w = Math.floor(vw * 0.96);
           h = Math.round(w * ASPECT_H / ASPECT_W);
@@ -196,37 +200,20 @@
         wrapper.style.height = h + 'px';
       }
 
-      function sizeMobilePortrait() {
-        wrapper.style.width = window.innerWidth + 'px';
-        wrapper.style.height = window.innerHeight + 'px';
-      }
-
       function applySizing() {
-        const mobile = isMobileUA();
-        const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-
-        if (mobile) {
-          if (isPortrait) {
-            sizeMobilePortrait();
-            // Optional perf tweak on low-end phones:
-            // config.devicePixelRatio = 1;
-          }
-          // Landscape handled by CSS overlay
-        } else {
-          sizeDesktopPortrait();
-        }
+        if (!isMobileUA()) sizeDesktopPortrait();
+        // mobile portrait is pure CSS with --vh, no JS needed
       }
 
       window.addEventListener('resize', applySizing);
-      window.addEventListener('orientationchange', applySizing);
       document.addEventListener('DOMContentLoaded', applySizing);
       applySizing();
     })();
 
-    // Show loading bar
+    /* Show loading bar */
     document.querySelector("#unity-loading-bar").style.display = "block";
 
-    // Load Unity
+    /* Load Unity */
     const script = document.createElement("script");
     script.src = loaderUrl;
     script.onload = () => {
