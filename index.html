@@ -1,235 +1,238 @@
 <!DOCTYPE html>
 <html lang="en-us">
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>Unity Web Player | horseGame URP</title>
-  <link rel="shortcut icon" href="TemplateData/favicon.ico" />
-  <link rel="stylesheet" href="TemplateData/style.css" />
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Unity Web Player | horseGame URP</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+    <link rel="stylesheet" href="TemplateData/style.css" />
 
-  <!-- Mobile responsiveness + safe areas -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Responsive + safe-area -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, height=device-height" />
 
-  <style>
-    :root { --vhpx: 100; } /* will be set in JS = visualViewport.height */
-
-    html, body {
-      margin: 0; padding: 0;
-      height: 100%;
-      background: #0b0b0b;
-      overscroll-behavior: none;
-      -webkit-text-size-adjust: 100%;
-    }
-
-    /* Neutralize Unity template classes that might fight sizing */
-    .unity-mobile, .unity-desktop { all: unset; }
-
-    /* Root container centers the game area */
-    #unity-container {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: #0b0b0b;
-      /* Safe-area padding so nothing is under notches/home indicator */
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
-
-    /* Desktop: phone-like frame (9:16). Mobile fills screen. */
-    .portrait-wrapper {
-      position: relative; display: block; box-sizing: border-box;
-      background: #000; border-radius: 24px; overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-      width: 405px; height: 720px; /* default for desktop; JS resizes */
-      touch-action: none;
-    }
-
-    /* Canvas always fills the wrapper */
-    #unity-canvas {
-      display: block;
-      width: 100% !important;
-      height: 100% !important;
-      background: #000;
-      touch-action: none;
-    }
-
-    /* Loading bar & warning positions */
-    #unity-loading-bar {
-      position: absolute; left: 50%; transform: translateX(-50%);
-      bottom: 14px; z-index: 10;
-    }
-    #unity-warning {
-      position: absolute; top: 8px; left: 8px; right: 8px; z-index: 11;
-    }
-
-    /* MOBILE portrait: fill the *true* visible screen (driven by JS var) */
-    @media (max-width: 1024px) and (orientation: portrait) {
-      .portrait-wrapper {
-        width: 100vw !important;
-        height: calc(var(--vhpx) * 1px) !important; /* rock-solid on iOS */
-        border-radius: 0; box-shadow: none;
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #0b0b0b;
+        overscroll-behavior: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: none;
       }
-    }
 
-    /* MOBILE landscape: show rotate message and hide game */
-    #rotate-overlay {
-      position: fixed; inset: 0; z-index: 9998;
-      display: none; align-items: center; justify-content: center;
-      background: #0b0b0b; color: #fff; text-align: center; padding: 24px;
-      font: 600 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    }
-    @media (max-width: 1024px) and (orientation: landscape) {
-      #rotate-overlay { display: flex; }
-      #unity-container { visibility: hidden; }
-    }
+      /* Wrap everything to respect iPhone notches/home bar */
+      .safe {
+        position: fixed;
+        inset: 0;
+        padding-top: env(safe-area-inset-top);
+        padding-right: env(safe-area-inset-right);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        display: grid;
+        place-items: center;
 
-    /* Footer (desktop only) */
-    #unity-footer {
-      position: fixed; left: 0; right: 0; bottom: 0;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 8px 12px; color: #fff;
-      background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
-      z-index: 1000;
-    }
-    #unity-logo-title-footer { display: flex; align-items: center; gap: 10px; }
-    #unity-build-title { font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; opacity: .9; }
-    #unity-fullscreen-button { cursor: pointer; }
-    @media (max-width: 1024px) { #unity-footer { display: none; } } /* hide on phones */
-  </style>
-</head>
-<body>
-  <div id="rotate-overlay">Please rotate your device to portrait.</div>
+        /* --- FIX 1: Make initial height correct on iOS (URL bar issue) --- */
+        height: 100dvh; /* modern iOS/Chrome */
+      }
 
-  <div id="unity-container">
-    <div class="portrait-wrapper" id="portraitWrapper">
-      <canvas id="unity-canvas" width="768" height="1366" tabindex="-1"></canvas>
+      #unity-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
 
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
+      #unity-canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
+        background: #000;
+      }
+
+      #unity-loading-bar {
+        position: absolute;
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(360px, 80vw);
+        height: 8px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      #unity-progress-bar-empty { display: none; }
+      #unity-progress-bar-full {
+        width: 0%;
+        height: 100%;
+        background: #fff;
+        transition: width .2s ease;
+      }
+
+      #unity-footer {
+        position: absolute;
+        left: 0; right: 0;
+        bottom: env(safe-area-inset-bottom);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        pointer-events: auto;
+      }
+
+      #unity-warning { color: #fff; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="safe">
+      <div id="unity-container" class="unity-desktop">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+        <div id="unity-loading-bar">
           <div id="unity-progress-bar-full"></div>
         </div>
+
+        <div id="unity-warning"></div>
+
+        <div id="unity-footer">
+          <div id="unity-logo-title-footer"></div>
+          <div id="unity-fullscreen-button"></div>
+          <div id="unity-build-title">horseGame URP</div>
+        </div>
       </div>
-
-      <div id="unity-warning"></div>
     </div>
-  </div>
 
-  <div id="unity-footer">
-    <div id="unity-logo-title-footer">
-      <div id="unity-build-title">horseGame URP</div>
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-      <div id="unity-fullscreen-button" title="Fullscreen"></div>
-    </div>
-  </div>
+    <script>
+      const canvas = document.querySelector("#unity-canvas");
 
-  <script>
-    const canvas  = document.getElementById("unity-canvas");
-    const wrapper = document.getElementById("portraitWrapper");
-
-    /* --- iOS/Android robust viewport height fix --- */
-    function getViewportHeightPx() {
-      // Prefer visualViewport.height (most accurate for iOS Safari)
-      if (window.visualViewport && window.visualViewport.height) {
-        return Math.round(window.visualViewport.height);
-      }
-      // Fallbacks
-      return Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-    }
-    function updateVhVar() {
-      const vh = getViewportHeightPx();
-      document.documentElement.style.setProperty('--vhpx', String(vh));
-    }
-    updateVhVar();
-
-    // Update on all relevant signals (iOS URL bar show/hide, rotation, pinch)
-    window.addEventListener('resize', updateVhVar, { passive: true });
-    window.addEventListener('orientationchange', updateVhVar, { passive: true });
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateVhVar, { passive: true });
-      window.visualViewport.addEventListener('scroll', updateVhVar, { passive: true });
-    }
-    document.addEventListener('DOMContentLoaded', updateVhVar);
-
-    function isMobileUA() {
-      return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    }
-
-    /* Desktop: keep a fitted 9:16 frame centered */
-    (function desktopSizer() {
-      const ASPECT_W = 9, ASPECT_H = 16;
-      function sizeDesktop() {
-        if (isMobileUA()) return; // mobile is CSS-driven via --vhpx
-        const vw = window.innerWidth, vh = window.innerHeight;
-        const maxH = Math.min(Math.floor(vh * 0.96), 1080); // optional cap
-        let h = maxH, w = Math.round(h * ASPECT_W / ASPECT_H);
-        if (w > vw * 0.96) {
-          w = Math.floor(vw * 0.96);
-          h = Math.round(w * ASPECT_H / ASPECT_W);
+      function unityShowBanner(msg, type) {
+        const warningBanner = document.querySelector("#unity-warning");
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
         }
-        wrapper.style.width  = w + 'px';
-        wrapper.style.height = h + 'px';
+        const div = document.createElement('div');
+        div.innerHTML = msg;
+        div.style = 'padding: 10px; margin: 6px auto; max-width: 90vw; border-radius: 6px;';
+        if (type === 'error') div.style.background = 'rgba(255,0,0,.85)';
+        else {
+          if (type === 'warning') div.style.background = 'rgba(255,255,0,.85)';
+          setTimeout(() => { warningBanner.removeChild(div); updateBannerVisibility(); }, 5000);
+        }
+        warningBanner.appendChild(div);
+        updateBannerVisibility();
       }
-      window.addEventListener('resize', sizeDesktop, { passive: true });
-      document.addEventListener('DOMContentLoaded', sizeDesktop);
-      sizeDesktop();
-    })();
 
-    /* Unity banner */
-    function unityShowBanner(msg, type) {
-      const warningBanner = document.querySelector("#unity-warning");
-      function update() { warningBanner.style.display = warningBanner.children.length ? 'block' : 'none'; }
-      const div = document.createElement('div');
-      div.innerHTML = msg;
-      warningBanner.appendChild(div);
-      if (type === 'error') {
-        div.style = 'background:red; padding:10px;';
+      const buildUrl = "Build";
+      const loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
+      const config = {
+        arguments: [],
+        dataUrl: buildUrl + "/BuildWebGLv4.0.data.unityweb",
+        frameworkUrl: buildUrl + "/BuildWebGLv4.0.framework.js.unityweb",
+        codeUrl: buildUrl + "/BuildWebGLv4.0.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "horseGame URP",
+        productVersion: "0.1.0",
+        showBanner: unityShowBanner
+      };
+
+      // ---------- RESPONSIVE SCALING ----------
+      const ASPECT = 9 / 16;   // portrait 1080x1920
+      const MAX_DPR = 1.75;
+
+      function viewportSize() {
+        const vv = window.visualViewport;
+        return {
+          w: vv ? vv.width  : window.innerWidth,
+          h: vv ? vv.height : window.innerHeight
+        };
+      }
+
+      function resizeCanvas() {
+        const { w, h } = viewportSize();
+
+        // Fit inside screen while preserving aspect (letterbox)
+        let cssW, cssH;
+        if (w / h > ASPECT) {
+          cssH = h;
+          cssW = h * ASPECT;
+        } else {
+          cssW = w;
+          cssH = w / ASPECT;
+        }
+
+        canvas.style.width  = cssW + "px";
+        canvas.style.height = cssH + "px";
+
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+        canvas.width  = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+      }
+
+      // --- FIX 2: run a stabilization loop at boot & after orientation
+      function stabilizeResize(durationMs = 600, stepMs = 100) {
+        const start = performance.now();
+        function tick(now) {
+          resizeCanvas();
+          if (now - start < durationMs) requestAnimationFrame(tick);
+        }
+        // first immediate pass then a few frames while Safari settles
+        resizeCanvas();
+        requestAnimationFrame(tick);
+        setTimeout(resizeCanvas, stepMs);       // extra nudge
+        setTimeout(resizeCanvas, stepMs * 3);   // extra nudge
+      }
+
+      // Initial sizing
+      stabilizeResize();
+
+      let raf;
+      function queueResize() { cancelAnimationFrame(raf); raf = requestAnimationFrame(resizeCanvas); }
+      window.addEventListener('resize', queueResize);
+      window.addEventListener('orientationchange', () => {
+        // give iOS a moment to recalc viewport, then stabilize
+        setTimeout(() => stabilizeResize(), 120);
+      });
+      window.addEventListener('pageshow', () => stabilizeResize());
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) stabilizeResize(); });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', queueResize);
+        window.visualViewport.addEventListener('scroll', queueResize);
+      }
+
+      // Mobile tweaks
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        document.querySelector("#unity-container").className = "unity-mobile";
+        canvas.className = "unity-mobile";
+        config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DPR);
       } else {
-        if (type === 'warning') div.style = 'background:yellow; padding:10px;';
-        setTimeout(() => { warningBanner.removeChild(div); update(); }, 5000);
+        // Desktop fallback windowed size (optional)
+        canvas.style.width = "1080px";
+        canvas.style.height = "1920px";
       }
-      update();
-    }
 
-    /* Build config */
-    const buildUrl  = "Build";
-    const loaderUrl = buildUrl + "/BuildWebGLv4.0.loader.js";
-    const config = {
-      arguments: [],
-      dataUrl: buildUrl + "/BuildWebGLv4.0.data.unityweb",
-      frameworkUrl: buildUrl + "/BuildWebGLv4.0.framework.js.unityweb",
-      codeUrl: buildUrl + "/BuildWebGLv4.0.wasm.unityweb",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "DefaultCompany",
-      productName: "horseGame URP",
-      productVersion: "0.1.0",
-      showBanner: unityShowBanner
-      // Default: Unity matches WebGL render target to canvas CSS size (desired)
-    };
+      document.querySelector("#unity-loading-bar").style.display = "block";
 
-    /* Show loading bar */
-    document.querySelector("#unity-loading-bar").style.display = "block";
-
-    /* Load Unity */
-    let unityInstance = null;
-    const script = document.createElement("script");
-    script.src = loaderUrl;
-    script.onload = () => {
-      createUnityInstance(canvas, config, (progress) => {
-        document.querySelector("#unity-progress-bar-full").style.width = (100 * progress) + "%";
-      }).then((inst) => {
-        unityInstance = inst;
-        document.querySelector("#unity-loading-bar").style.display = "none";
-
-        // Desktop fullscreen button (hidden on phones by CSS)
-        const fsBtn = document.getElementById("unity-fullscreen-button");
-        if (fsBtn) fsBtn.onclick = () => unityInstance.SetFullscreen(1);
-      }).catch((message) => alert(message));
-    };
-    document.body.appendChild(script);
-  </script>
-</body>
+      // ---------- LOAD UNITY ----------
+      const script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          document.querySelector("#unity-progress-bar-full").style.width = (progress * 100).toFixed(0) + "%";
+        }).then((unityInstance) => {
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          document.querySelector("#unity-fullscreen-button").onclick = () => unityInstance.SetFullscreen(1);
+          stabilizeResize(); // ensure final size after Unity touches canvas
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
 </html>
